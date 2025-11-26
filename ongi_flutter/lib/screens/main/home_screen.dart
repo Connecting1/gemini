@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../../providers/model3d_provider.dart';
 import '../../services/api/api_service.dart';
+import '../gaussian_splatting/gaussian_splatting_viewer_screen.dart';
 
 class HomeScreenPage extends StatefulWidget {
   @override
@@ -121,10 +122,108 @@ class _HomeScreenPageState extends State<HomeScreenPage> {
 
   /// 헤더 이미지
   Widget _buildHeaderImage() {
-    return Image.asset(
-      _headerImagePath,
-      width: double.infinity,
-      fit: BoxFit.cover,
+    return Stack(
+      children: [
+        Image.asset(
+          _headerImagePath,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+        // 가우시안 스플래팅 뷰어 버튼
+        Positioned(
+          top: 40,
+          right: 16,
+          child: SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openGaussianSplattingViewer,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.view_in_ar,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          '가우시안 스플래팅',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 가우시안 스플래팅 뷰어 열기
+  void _openGaussianSplattingViewer() {
+    final modelProvider = Provider.of<Model3DProvider>(context, listen: false);
+    final currentModel = modelProvider.currentModel;
+
+    if (currentModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('표시할 3D 모델이 없습니다'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // 가우시안 스플래팅 모델 URL 확인 (예: gaussian_model_url 필드)
+    String? gaussianModelUrl = currentModel['gaussian_model_url'] ?? currentModel['model_url'];
+
+    if (gaussianModelUrl == null || gaussianModelUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('가우시안 스플래팅 모델이 없습니다'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // 뷰어 화면으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GaussianSplattingViewerScreen(
+          modelId: currentModel['id']?.toString() ?? 'unknown',
+          modelUrl: gaussianModelUrl,
+          modelName: currentModel['artifact_name'] ?? '3D 유물',
+          description: currentModel['description'],
+        ),
+      ),
     );
   }
 

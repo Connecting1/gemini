@@ -6,6 +6,7 @@ import 'providers/user_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/artifact_provider.dart';
 import 'providers/model3d_provider.dart';
+import 'providers/gaussian_splatting_provider.dart';
 import 'screens/auth/sign_up_start.dart';
 import 'screens/main/main_tab.dart';
 import '../../styles/app_styles.dart';
@@ -53,6 +54,7 @@ class OnGiApp extends StatelessWidget {
       _buildFeedProvider(),
       _buildArtifactProvider(),
       _buildModel3DProvider(),
+      _buildGaussianSplattingProvider(),
     ];
   }
 
@@ -102,6 +104,13 @@ class OnGiApp extends StatelessWidget {
   ChangeNotifierProvider<Model3DProvider> _buildModel3DProvider() {
     return ChangeNotifierProvider(
       create: (_) => Model3DProvider(),
+    );
+  }
+
+  /// GaussianSplattingProvider 생성
+  ChangeNotifierProvider<GaussianSplattingProvider> _buildGaussianSplattingProvider() {
+    return ChangeNotifierProvider(
+      create: (_) => GaussianSplattingProvider(),
     );
   }
 
