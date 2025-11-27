@@ -18,7 +18,7 @@ class Model3DSerializer(serializers.ModelSerializer):
     class Meta:
         model = Model3D
         fields = [
-            'id', 'artifact', 'artifact_name', 'model_url', 'thumbnail_url',
+            'id', 'artifact', 'artifact_name', 'model_url', 'gaussian_model_url', 'thumbnail_url',
             'file_format', 'poly_count', 'file_size', 'status',
             'processing_time', 'source_images', 'description', 'created_at', 'updated_at'
         ]
