@@ -1,0 +1,20 @@
+# Unity generated files
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Library/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Temp/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Obj/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Build/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Builds/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/Logs/
+unity_gaussian_splatting_viewer/UnityGaussianSplattingViewer/UserSettings/
+
+# Android Unity Library (빌드 결과물)
+ongi_flutter/android/app/libs/
+ongi_flutter/android/unityLibrary/libs/
+ongi_flutter/android/unityLibrary/build/
+
+# Flutter/Dart
+ongi_flutter/.dart_tool/
+ongi_flutter/.flutter-plugins
+ongi_flutter/.flutter-plugins-dependencies
+ongi_flutter/.packages
+ongi_flutter/build/
