@@ -129,33 +129,40 @@ public class SplatLoader : MonoBehaviour
 
         loadingProgress = 0f;
         byte[] fileData = null;
-        Exception loadException = null;
+        bool hasError = false;
 
-        try
+        // 파일 크기 확인
+        FileInfo fileInfo = new FileInfo(filePath);
+        long fileSize = fileInfo.Length;
+        float fileSizeMB = fileSize / (1024f * 1024f);
+        Debug.Log($"Loading PLY file: {fileSizeMB:F2} MB");
+
+        // 백그라운드에서 파일 읽기 시작
+        Task<byte[]> loadTask = Task.Run(() => LoadFileInChunks(filePath, cancellationTokenSource.Token), cancellationTokenSource.Token);
+
+        // 로딩 완료 대기 (진행률 업데이트)
+        while (!loadTask.IsCompleted)
         {
-            // 파일 크기 확인
-            FileInfo fileInfo = new FileInfo(filePath);
-            long fileSize = fileInfo.Length;
-            float fileSizeMB = fileSize / (1024f * 1024f);
-            Debug.Log($"Loading PLY file: {fileSizeMB:F2} MB");
+            // 진행률을 Flutter로 전송
+            SendMessageToFlutter("loading_progress", $"{(loadingProgress * 100):F1}");
+            yield return null;
+        }
 
-            // 백그라운드에서 파일 읽기 시작
-            Task<byte[]> loadTask = Task.Run(() => LoadFileInChunks(filePath, cancellationTokenSource.Token), cancellationTokenSource.Token);
-
-            // 로딩 완료 대기 (진행률 업데이트)
-            while (!loadTask.IsCompleted)
-            {
-                // 진행률을 Flutter로 전송
-                SendMessageToFlutter("loading_progress", $"{(loadingProgress * 100):F1}");
-                yield return null;
-            }
-
-            // 작업 취소 확인
-            if (cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                throw new Exception("Loading cancelled");
-            }
-
+        // 작업 취소 확인
+        if (cancellationTokenSource.Token.IsCancellationRequested)
+        {
+            Debug.LogWarning("Loading cancelled");
+            SendMessageToFlutter("error", "Loading cancelled");
+            hasError = true;
+        }
+        else if (loadTask.IsFaulted)
+        {
+            Debug.LogError($"Failed to load file: {loadTask.Exception?.Message}");
+            SendMessageToFlutter("error", $"Load failed: {loadTask.Exception?.Message}");
+            hasError = true;
+        }
+        else
+        {
             // 결과 가져오기
             fileData = loadTask.Result;
             Debug.Log($"File loaded in background: {fileData.Length} bytes");
@@ -171,38 +178,34 @@ public class SplatLoader : MonoBehaviour
 
             if (!loadSuccess)
             {
-                throw new Exception("Failed to parse PLY file");
+                Debug.LogError("Failed to parse PLY file");
+                SendMessageToFlutter("error", "Failed to parse PLY file");
+                hasError = true;
             }
-
-            // 렌더러에 에셋 할당
-            splatRenderer.m_Asset = currentAsset;
-
-            // 카메라 위치 조정
-            AdjustCameraPosition();
-
-            Debug.Log("Model loaded successfully");
-            SendMessageToFlutter("loading_completed", filePath);
-        }
-        catch (Exception e)
-        {
-            loadException = e;
-            Debug.LogError($"Failed to load model: {e.Message}\n{e.StackTrace}");
-            SendMessageToFlutter("error", $"Load failed: {e.Message}");
-        }
-        finally
-        {
-            // 메모리 정리
-            fileData = null;
-            GC.Collect();
-
-            // 로딩 인디케이터 숨김
-            if (loadingIndicator != null)
+            else
             {
-                loadingIndicator.SetActive(false);
-            }
+                // 렌더러에 에셋 할당
+                splatRenderer.m_Asset = currentAsset;
 
-            loadingProgress = 0f;
+                // 카메라 위치 조정
+                AdjustCameraPosition();
+
+                Debug.Log("Model loaded successfully");
+                SendMessageToFlutter("loading_completed", filePath);
+            }
         }
+
+        // 메모리 정리
+        fileData = null;
+        GC.Collect();
+
+        // 로딩 인디케이터 숨김
+        if (loadingIndicator != null)
+        {
+            loadingIndicator.SetActive(false);
+        }
+
+        loadingProgress = 0f;
     }
 
     /// <summary>
@@ -267,77 +270,71 @@ public class SplatLoader : MonoBehaviour
     /// </summary>
     private IEnumerator LoadPlyData(byte[] fileData, Action<bool> callback)
     {
-        try
+        Debug.Log($"Starting PLY parsing: {fileData.Length / (1024 * 1024)} MB");
+        loadingProgress = 0.9f; // 파일 로딩 완료, 파싱 시작
+
+        bool parseSuccess = false;
+
+        using (MemoryStream stream = new MemoryStream(fileData))
         {
-            Debug.Log($"Starting PLY parsing: {fileData.Length / (1024 * 1024)} MB");
-            loadingProgress = 0.9f; // 파일 로딩 완료, 파싱 시작
+            // PLY 파일 파싱 (GaussianSplatting 플러그인 사용)
+            // 실제 구현은 Aras-p/UnityGaussianSplatting 플러그인의 API에 따름
 
-            using (MemoryStream stream = new MemoryStream(fileData))
+            // 파일 헤더 검증
+            using (StreamReader reader = new StreamReader(stream))
             {
-                // PLY 파일 파싱 (GaussianSplatting 플러그인 사용)
-                // 실제 구현은 Aras-p/UnityGaussianSplatting 플러그인의 API에 따름
-
-                // 파일 헤더 검증
-                using (StreamReader reader = new StreamReader(stream))
+                string firstLine = reader.ReadLine();
+                if (firstLine != null && firstLine.Trim().ToLower() == "ply")
                 {
-                    string firstLine = reader.ReadLine();
-                    if (firstLine != null && firstLine.Trim().ToLower() == "ply")
+                    Debug.Log("Valid PLY file detected - header verified");
+
+                    // PLY 헤더 정보 읽기
+                    int vertexCount = 0;
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        Debug.Log("Valid PLY file detected - header verified");
+                        line = line.Trim();
 
-                        // PLY 헤더 정보 읽기
-                        int vertexCount = 0;
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
+                        // vertex 개수 파싱
+                        if (line.StartsWith("element vertex"))
                         {
-                            line = line.Trim();
-
-                            // vertex 개수 파싱
-                            if (line.StartsWith("element vertex"))
+                            string[] parts = line.Split(' ');
+                            if (parts.Length >= 3)
                             {
-                                string[] parts = line.Split(' ');
-                                if (parts.Length >= 3)
-                                {
-                                    int.TryParse(parts[2], out vertexCount);
-                                    Debug.Log($"PLY contains {vertexCount:N0} vertices");
-                                }
-                            }
-
-                            // 헤더 끝
-                            if (line == "end_header")
-                            {
-                                break;
+                                int.TryParse(parts[2], out vertexCount);
+                                Debug.Log($"PLY contains {vertexCount:N0} vertices");
                             }
                         }
 
-                        // 진행률 업데이트
-                        loadingProgress = 0.95f;
-                        yield return null;
-
-                        // TODO: 실제 파싱 로직은 GaussianSplatting 플러그인 API 사용
-                        // 현재는 플러그인 API가 구현되지 않아 헤더 검증만 수행
-                        // currentAsset.LoadFromPly(fileData);
-
-                        Debug.Log("PLY parsing completed (header validation only - awaiting plugin implementation)");
-                        loadingProgress = 1.0f;
-
-                        callback(true);
-                        yield break;
+                        // 헤더 끝
+                        if (line == "end_header")
+                        {
+                            break;
+                        }
                     }
-                    else
-                    {
-                        Debug.LogError($"Invalid PLY file: Expected 'ply' header, got '{firstLine}'");
-                    }
+
+                    // 진행률 업데이트
+                    loadingProgress = 0.95f;
+                    yield return null;
+
+                    // TODO: 실제 파싱 로직은 GaussianSplatting 플러그인 API 사용
+                    // 현재는 플러그인 API가 구현되지 않아 헤더 검증만 수행
+                    // currentAsset.LoadFromPly(fileData);
+
+                    Debug.Log("PLY parsing completed (header validation only - awaiting plugin implementation)");
+                    loadingProgress = 1.0f;
+
+                    parseSuccess = true;
+                }
+                else
+                {
+                    Debug.LogError($"Invalid PLY file: Expected 'ply' header, got '{firstLine}'");
+                    parseSuccess = false;
                 }
             }
+        }
 
-            callback(false);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"PLY parsing error: {e.Message}\n{e.StackTrace}");
-            callback(false);
-        }
+        callback(parseSuccess);
     }
 
     /// <summary>
