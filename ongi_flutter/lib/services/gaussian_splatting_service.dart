@@ -152,6 +152,32 @@ class GaussianSplattingService {
         throw Exception('다운로드한 파일이 비어있습니다');
       }
 
+      // Git LFS 포인터 파일인지 확인
+      final lfsData = await _parseGitLfsPointer(savePath);
+      if (lfsData != null && lfsData.containsKey('oid')) {
+        debugPrint('Git LFS 포인터 감지됨. 실제 파일 다운로드 시작...');
+
+        // 기존 포인터 파일 삭제
+        await file.delete();
+
+        // Git LFS에서 실제 파일 다운로드
+        try {
+          await _downloadFromGitLfs(
+            lfsData['oid']!,
+            savePath,
+            fullUrl,
+            onProgress,
+          );
+
+          // 다운로드 완료 후 파일 검증
+          final newFileSize = await File(savePath).length();
+          debugPrint('Git LFS 파일 크기: ${formatFileSize(newFileSize)}');
+        } catch (e) {
+          debugPrint('Git LFS 다운로드 실패: $e');
+          throw Exception('Git LFS 파일 다운로드 실패: $e');
+        }
+      }
+
       // PLY 파일 헤더 검증
       try {
         debugPrint('PLY 헤더 검증 중...');
@@ -179,6 +205,83 @@ class GaussianSplattingService {
 
     final formattedUrl = url.startsWith('/') ? url : '/$url';
     return "${ApiService.baseUrl}$formattedUrl";
+  }
+
+  /// Git LFS 포인터 파일인지 확인 및 파싱
+  Future<Map<String, String>?> _parseGitLfsPointer(String filePath) async {
+    try {
+      final file = File(filePath);
+      final content = await file.readAsString();
+      final lines = content.split('\n');
+
+      // Git LFS 포인터 파일은 "version https://git-lfs.github.com/spec/v1"로 시작
+      if (lines.isNotEmpty && lines[0].trim().startsWith('version https://git-lfs.github.com')) {
+        final Map<String, String> lfsData = {};
+
+        for (var line in lines) {
+          final parts = line.trim().split(' ');
+          if (parts.length == 2) {
+            lfsData[parts[0]] = parts[1];
+          } else if (parts.length == 3 && parts[0] == 'oid') {
+            // "oid sha256:xxxxx" 형식 처리
+            lfsData['oid'] = parts[1].replaceAll('sha256:', '');
+          }
+        }
+
+        debugPrint('Git LFS 포인터 파일 감지됨: ${lfsData['oid']}');
+        return lfsData;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Git LFS 포인터 파싱 실패: $e');
+      return null;
+    }
+  }
+
+  /// Git LFS에서 실제 파일 다운로드
+  Future<void> _downloadFromGitLfs(
+    String oid,
+    String savePath,
+    String originalUrl,
+    Function(double)? onProgress,
+  ) async {
+    // GitHub LFS URL 구성
+    // 원본 URL에서 repository 정보 추출
+    Uri uri = Uri.parse(originalUrl);
+
+    // GitHub LFS 다운로드 URL 패턴
+    // https://media.githubusercontent.com/media/{owner}/{repo}/{branch}/{path}
+    String lfsUrl;
+
+    if (originalUrl.contains('github.com')) {
+      // GitHub URL을 LFS media URL로 변환
+      lfsUrl = originalUrl.replaceAll(
+        'raw.githubusercontent.com',
+        'media.githubusercontent.com/media',
+      ).replaceAll(
+        'github.com',
+        'media.githubusercontent.com/media',
+      );
+
+      debugPrint('Git LFS 다운로드 URL: $lfsUrl');
+    } else {
+      throw Exception('Git LFS는 GitHub URL만 지원합니다');
+    }
+
+    // 실제 파일 다운로드
+    await _dio.download(
+      lfsUrl,
+      savePath,
+      onReceiveProgress: (received, total) {
+        if (total != -1 && onProgress != null) {
+          final progress = received / total;
+          onProgress(progress);
+        }
+      },
+    );
+
+    debugPrint('Git LFS 파일 다운로드 완료');
   }
 
   /// PLY 파일 유효성 검증 (헤더 확인)
