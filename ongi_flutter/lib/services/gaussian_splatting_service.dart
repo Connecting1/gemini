@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:flutter/foundation.dart';
 import 'api/api_service.dart';
 
 /// 가우시안 스플래팅 .ply 파일 다운로드 및 관리 서비스
@@ -110,17 +111,21 @@ class GaussianSplattingService {
 
       // 전체 URL 구성
       final fullUrl = _buildFullUrl(modelUrl);
+      debugPrint('PLY 다운로드 시작: $fullUrl');
 
       // 로컬 저장 경로
       final savePath = await getLocalPlyPath(modelId);
+      debugPrint('저장 경로: $savePath');
 
       // 이미 파일이 존재하면 기존 파일 삭제
       final file = File(savePath);
       if (await file.exists()) {
         await file.delete();
+        debugPrint('기존 파일 삭제됨');
       }
 
       // 다운로드 실행
+      debugPrint('다운로드 시작...');
       await _dio.download(
         fullUrl,
         savePath,
@@ -133,20 +138,29 @@ class GaussianSplattingService {
       );
 
       // 파일 유효성 검증
+      debugPrint('다운로드 완료. 파일 검증 중...');
+
       if (!await file.exists()) {
         throw Exception('다운로드한 파일을 찾을 수 없습니다');
       }
 
       final fileSize = await file.length();
+      debugPrint('다운로드된 파일 크기: ${formatFileSize(fileSize)}');
+
       if (fileSize == 0) {
         await file.delete();
         throw Exception('다운로드한 파일이 비어있습니다');
       }
 
       // PLY 파일 헤더 검증
-      if (!await _validatePlyFile(savePath)) {
+      try {
+        debugPrint('PLY 헤더 검증 중...');
+        await _validatePlyFile(savePath);
+        debugPrint('PLY 파일 검증 성공!');
+      } catch (e) {
+        debugPrint('PLY 파일 검증 실패: $e');
         await file.delete();
-        throw Exception('유효하지 않은 PLY 파일입니다');
+        rethrow;
       }
 
       return savePath;
@@ -175,16 +189,30 @@ class GaussianSplattingService {
           .openRead()
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .take(5)
+          .take(10)
           .toList();
 
-      if (lines.isEmpty) return false;
+      if (lines.isEmpty) {
+        throw Exception('파일이 비어있습니다');
+      }
 
       // PLY 파일은 "ply"로 시작해야 함
       final firstLine = lines[0].trim().toLowerCase();
-      return firstLine == 'ply';
+      if (firstLine != 'ply') {
+        // 상세한 에러 메시지 제공
+        final preview = lines.take(3).join('\n').substring(0, 200.clamp(0, lines.take(3).join('\n').length));
+        throw Exception(
+          '유효하지 않은 PLY 파일입니다. 파일 내용:\n$preview...'
+        );
+      }
+
+      return true;
     } catch (e) {
-      return false;
+      // 이미 Exception인 경우 그대로 던지기
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('파일 검증 중 오류: $e');
     }
   }
 
