@@ -21,7 +21,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/feeds/', include('feeds.urls')),
     path('api/artifacts/', include('artifacts.urls')),
-    path('api/models/', include('model3d.urls')),
+    path('api/model3d/', include('model3d.urls')),
 ]
 
 # DEBUG=True일 때 미디어 파일 서빙 (CORS 헤더 추가)
