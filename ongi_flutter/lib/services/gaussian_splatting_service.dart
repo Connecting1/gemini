@@ -155,26 +155,39 @@ class GaussianSplattingService {
       // Git LFS 포인터 파일인지 확인
       final lfsData = await _parseGitLfsPointer(savePath);
       if (lfsData != null && lfsData.containsKey('oid')) {
-        debugPrint('Git LFS 포인터 감지됨. 실제 파일 다운로드 시작...');
+        debugPrint('Git LFS 포인터 감지됨.');
 
-        // 기존 포인터 파일 삭제
-        await file.delete();
+        // GitHub URL인 경우만 Git LFS 다운로드 시도
+        if (fullUrl.contains('github.com') || fullUrl.contains('githubusercontent.com')) {
+          debugPrint('GitHub URL 감지. Git LFS에서 실제 파일 다운로드 시작...');
 
-        // Git LFS에서 실제 파일 다운로드
-        try {
-          await _downloadFromGitLfs(
-            lfsData['oid']!,
-            savePath,
-            fullUrl,
-            onProgress,
+          // 기존 포인터 파일 삭제
+          await file.delete();
+
+          // Git LFS에서 실제 파일 다운로드
+          try {
+            await _downloadFromGitLfs(
+              lfsData['oid']!,
+              savePath,
+              fullUrl,
+              onProgress,
+            );
+
+            // 다운로드 완료 후 파일 검증
+            final newFileSize = await File(savePath).length();
+            debugPrint('Git LFS 파일 크기: ${formatFileSize(newFileSize)}');
+          } catch (e) {
+            debugPrint('Git LFS 다운로드 실패: $e');
+            throw Exception('Git LFS 파일 다운로드 실패: $e');
+          }
+        } else {
+          // GitHub가 아닌 서버에서 Git LFS 포인터 파일을 받은 경우
+          debugPrint('경고: 서버가 Git LFS 포인터 파일을 반환했습니다.');
+          await file.delete();
+          throw Exception(
+            '서버 설정 오류: PLY 파일 대신 Git LFS 포인터가 반환되었습니다. '
+            '서버 관리자에게 문의하여 실제 PLY 파일이 제공되도록 설정해주세요.'
           );
-
-          // 다운로드 완료 후 파일 검증
-          final newFileSize = await File(savePath).length();
-          debugPrint('Git LFS 파일 크기: ${formatFileSize(newFileSize)}');
-        } catch (e) {
-          debugPrint('Git LFS 다운로드 실패: $e');
-          throw Exception('Git LFS 파일 다운로드 실패: $e');
         }
       }
 
