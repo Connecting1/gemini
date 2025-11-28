@@ -21,7 +21,7 @@ class Model3DAdmin(admin.ModelAdmin):
             'fields': ('id', 'artifact', 'description')
         }),
         ('모델 파일', {
-            'fields': ('model_url', 'thumbnail_url', 'file_format')
+            'fields': ('model_url', 'gaussian_model_url', 'thumbnail_url', 'file_format')
         }),
         ('상태 정보', {
             'fields': ('status', 'poly_count', 'file_size', 'processing_time')
