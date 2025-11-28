@@ -24,7 +24,7 @@ class Model3D(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     artifact = models.ForeignKey(Artifact, on_delete=models.CASCADE, related_name='models')
-    model_url = models.FileField(upload_to='models/')
+    model_url = models.FileField(upload_to='models/', blank=True, null=True)  # GLB/GLTF 파일 (선택사항)
     gaussian_model_url = models.FileField(upload_to='gaussian/', blank=True, null=True, help_text='가우시안 스플래팅 PLY 파일')  # 가우시안 스플래팅 모델
     thumbnail_url = models.ImageField(upload_to='models/thumbnails/', blank=True, null=True)  # 3D 모델 썸네일 이미지
 
