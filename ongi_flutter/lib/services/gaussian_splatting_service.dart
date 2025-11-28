@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -170,7 +171,12 @@ class GaussianSplattingService {
   Future<bool> _validatePlyFile(String filePath) async {
     try {
       final file = File(filePath);
-      final lines = await file.openRead().transform(const SystemEncoding().decoder).take(5).toList();
+      final lines = await file
+          .openRead()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .take(5)
+          .toList();
 
       if (lines.isEmpty) return false;
 
