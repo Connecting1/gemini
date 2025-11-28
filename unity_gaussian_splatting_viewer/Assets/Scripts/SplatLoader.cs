@@ -5,7 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using GaussianSplatting;
+using GaussianSplatting.Runtime;
 
 /// <summary>
 /// 가우시안 스플래팅 .ply 파일을 동적으로 로드하는 스크립트
