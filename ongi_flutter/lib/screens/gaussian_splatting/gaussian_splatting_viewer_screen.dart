@@ -83,18 +83,28 @@ class _GaussianSplattingViewerScreenState
 
   /// Unity에 모델 파일 경로 전송
   void _sendModelToUnity(String filePath) {
-    if (_unityController == null) return;
+    if (_unityController == null) {
+      debugPrint('ERROR: Unity controller is null, cannot send model');
+      return;
+    }
+
+    debugPrint('=== SENDING MODEL TO UNITY ===');
+    debugPrint('File path: $filePath');
 
     final message = jsonEncode({
       'type': 'load_model',
       'data': filePath,
     });
 
+    debugPrint('Message JSON: $message');
+
     _unityController!.postMessage(
       'UnityMessageManager',
       'OnFlutterMessage',
       message,
     );
+
+    debugPrint('=== MESSAGE SENT TO UNITY ===');
 
     setState(() {
       _statusMessage = '모델 로딩 중...';
@@ -116,13 +126,19 @@ class _GaussianSplattingViewerScreenState
       switch (type) {
         case 'unity_ready':
           // Unity 초기화 완료
-          debugPrint('Unity is ready, sending model path...');
-          final provider = Provider.of<GaussianSplattingProvider>(
-            context,
-            listen: false,
-          );
-          if (provider.currentFilePath != null) {
-            _sendModelToUnity(provider.currentFilePath!);
+          debugPrint('Unity ready signal received');
+          // 이미 모델이 전송되었으면 무시 (중복 전송 방지)
+          if (!_isModelLoaded) {
+            final provider = Provider.of<GaussianSplattingProvider>(
+              context,
+              listen: false,
+            );
+            if (provider.currentFilePath != null) {
+              debugPrint('Sending model to Unity after ready signal...');
+              _sendModelToUnity(provider.currentFilePath!);
+            }
+          } else {
+            debugPrint('Model already sent, ignoring unity_ready signal');
           }
           break;
 
@@ -167,16 +183,16 @@ class _GaussianSplattingViewerScreenState
       _statusMessage = 'Unity 엔진 로드 중...';
     });
 
-    // Unity가 unity_ready 메시지를 보낼 때까지 대기
-    // 만약 5초 내에 unity_ready 메시지가 없으면 직접 모델 전송 (fallback)
-    Future.delayed(const Duration(seconds: 5), () {
+    // Unity 위젯이 생성되면 잠시 대기 후 모델 전송
+    // Unity의 첫 렌더링 프레임을 기다림
+    Future.delayed(const Duration(milliseconds: 500), () {
       final provider = Provider.of<GaussianSplattingProvider>(
         context,
         listen: false,
       );
 
       if (!_isModelLoaded && provider.currentFilePath != null) {
-        debugPrint('Timeout: Unity ready signal not received, sending model anyway');
+        debugPrint('Unity widget ready, sending model to Unity...');
         _sendModelToUnity(provider.currentFilePath!);
       }
     });

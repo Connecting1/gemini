@@ -25,6 +25,8 @@ public class SplatLoader : MonoBehaviour
     private Coroutine loadingCoroutine;
     private CancellationTokenSource cancellationTokenSource;
     private float loadingProgress = 0f;
+    private bool unityReadyNotificationSent = false;
+    private int frameCount = 0;
 
     void Start()
     {
@@ -45,9 +47,20 @@ public class SplatLoader : MonoBehaviour
         }
 
         Debug.Log("SplatLoader initialized and ready to receive file paths");
+    }
 
-        // Unity 초기화 완료를 Flutter에 알림 (1초 후 - Unity 완전 초기화 대기)
-        Invoke("NotifyUnityReady", 1.0f);
+    void Update()
+    {
+        // Unity 렌더링이 안정화될 때까지 대기 (3프레임 후)
+        if (!unityReadyNotificationSent)
+        {
+            frameCount++;
+            if (frameCount >= 3)
+            {
+                NotifyUnityReady();
+                unityReadyNotificationSent = true;
+            }
+        }
     }
 
     /// <summary>
@@ -55,8 +68,9 @@ public class SplatLoader : MonoBehaviour
     /// </summary>
     private void NotifyUnityReady()
     {
-        Debug.Log("Sending Unity ready notification to Flutter");
+        Debug.Log("=== SENDING UNITY READY SIGNAL TO FLUTTER ===");
         SendMessageToFlutter("unity_ready", "Unity initialization completed");
+        Debug.Log("=== UNITY READY SIGNAL SENT ===");
     }
 
     /// <summary>
