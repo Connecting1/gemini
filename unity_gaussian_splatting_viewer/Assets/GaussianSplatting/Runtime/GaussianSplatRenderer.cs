@@ -249,6 +249,8 @@ namespace GaussianSplatting.Runtime
         public Shader m_ShaderDebugBoxes;
         [Tooltip("Gaussian splatting compute shader")]
         public ComputeShader m_CSSplatUtilities;
+        [Tooltip("GPU sorting compute shader (optional, requires wave operations - may not work on all Android devices)")]
+        public ComputeShader m_CSSplatSorting;
 
         int m_SplatCount; // initially same as asset splat count, but editing can change this
         GraphicsBuffer m_GpuSortDistances;
@@ -462,7 +464,9 @@ namespace GaussianSplatting.Runtime
         {
             if (m_Sorter == null && resourcesAreSetUp)
             {
-                m_Sorter = new GpuSorting(m_CSSplatUtilities);
+                // Use separate sorting compute shader if available, otherwise try with utilities shader
+                ComputeShader sortingCS = m_CSSplatSorting != null ? m_CSSplatSorting : m_CSSplatUtilities;
+                m_Sorter = new GpuSorting(sortingCS);
             }
 
             if (!m_Registered && resourcesAreSetUp)

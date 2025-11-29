@@ -7,6 +7,9 @@ namespace GaussianSplatting.Runtime
     // GPU (uint key, uint payload) 8 bit-LSD radix sort, using reduce-then-scan
     // Copyright Thomas Smith 2024, MIT license
     // https://github.com/b0nes164/GPUSorting
+    //
+    // Note: Sorting kernels have been moved to a separate SplatSorting.compute shader
+    // to avoid requiring wave operations for all compute kernels, improving Android compatibility.
 
     public class GpuSorting
     {
