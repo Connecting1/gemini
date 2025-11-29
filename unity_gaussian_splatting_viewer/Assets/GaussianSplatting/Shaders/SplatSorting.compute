@@ -10,6 +10,11 @@
 #pragma multi_compile __ SHOULD_ASCEND
 #pragma multi_compile __ SORT_PAIRS
 #pragma multi_compile __ VULKAN
+
+// Only compile these kernels on platforms that support wave operations
+// WebGL and some Android devices do not support these features
+#if !defined(SHADER_API_WEBGL) && !defined(SHADER_API_GLES3) && !defined(SHADER_API_GLES)
+
 #pragma kernel InitDeviceRadixSort
 #pragma kernel Upsweep
 #pragma kernel Scan
@@ -21,3 +26,5 @@
 #pragma use_dxc
 
 #include "DeviceRadixSort.hlsl"
+
+#endif // !WEBGL && !GLES
